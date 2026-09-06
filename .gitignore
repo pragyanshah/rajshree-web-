@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Database files (SQLite)
+database/*.db
+
+# Environment variables — NEVER commit this
+.env
+
+# Uploaded product images (keep on disk/cloud, not in git)
+# NOTE: If you deploy to a platform that wipes the filesystem (Render, Railway),
+#       you'll need cloud storage (S3, Cloudinary) for uploads instead.
+#       For local/VPS deployment, this gitignore entry is fine.
+public/uploads/*
+!public/uploads/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

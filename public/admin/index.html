@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel — Rajshree Electronics</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+
+<!-- ══ LOGIN SCREEN ══ -->
+<div id="loginScreen" class="screen">
+  <div class="login-card">
+    <div class="login-logo"><img src="/images/logo.png" alt="Rajshree Electronics Logo" style="height:80px;width:80px;object-fit:contain;border-radius:50%;"></div>
+    <h1>Rajshree Electronics</h1>
+    <p class="login-sub">Admin Panel — please sign in</p>
+    <form id="loginForm" autocomplete="on">
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" autocomplete="username" required placeholder="admin">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="••••••••">
+      </div>
+      <div id="loginError" class="error-msg" hidden></div>
+      <button type="submit" class="btn btn-primary btn-full" id="loginBtn">Sign In</button>
+    </form>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD SCREEN ══ -->
+<div id="dashboardScreen" class="screen" hidden>
+  <header class="admin-header">
+    <div class="admin-logo"><img src="/images/logo.png" alt="Rajshree Electronics Logo" style="height:36px;width:36px;object-fit:contain;border-radius:50%;vertical-align:middle;"> <span>Rajshree Electronics — Admin</span></div>
+    <div class="header-right">
+      <span style="font-size:12px; opacity:0.6; color:#fff;">Changes made here appear live on the storefront</span>
+      <a href="/" target="_blank" class="btn btn-ghost btn-sm" style="background:#1B8A5A; color:#fff; border-color:#1B8A5A;">&#127758; View Storefront ↗</a>
+      <button id="logoutBtn" class="btn btn-outline btn-sm">Sign Out</button>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <!-- Add / Edit Form -->
+    <section class="card form-card">
+      <div class="card-head">
+        <h2 id="formTitle">Add New Product</h2>
+        <button id="cancelEditBtn" class="btn btn-ghost btn-sm" hidden>Cancel Edit</button>
+      </div>
+      <form id="productForm" autocomplete="off">
+        <input type="hidden" id="editId">
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="f-name">Product Name *</label>
+            <input id="f-name" name="name" type="text" required placeholder="e.g. Samsung Galaxy S24 5G (256GB)">
+          </div>
+          <div class="field">
+            <label for="f-category">Category *</label>
+            <select id="f-category" name="category" required>
+              <option value="">— pick one —</option>
+              <option value="mobiles">Mobiles</option>
+              <option value="laptops">Laptops</option>
+              <option value="tvs">TVs</option>
+              <option value="audio">Audio</option>
+              <option value="appliances">Appliances</option>
+              <option value="accessories">Accessories</option>
+              <option value="fridge">Fridge</option>
+              <option value="washingmachine">Washing Machine</option>
+              <option value="remote">Remote</option>
+              <option value="ac">AC (Air Conditioner)</option>
+              <option value="speaker">Speaker</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-brand">Brand *</label>
+            <input id="f-brand" name="brand" type="text" required placeholder="Samsung, Apple, LG…">
+          </div>
+          <div class="field">
+            <label for="f-price">Price (₹) *</label>
+            <input id="f-price" name="price" type="number" min="0" required placeholder="74999">
+          </div>
+          <div class="field">
+            <label for="f-original-price">Original Price (₹)</label>
+            <input id="f-original-price" name="original_price" type="number" min="0" placeholder="79999 (for discount display)">
+          </div>
+          <div class="field">
+            <label for="f-rating">Rating (0–5)</label>
+            <input id="f-rating" name="rating" type="number" min="0" max="5" step="0.1" placeholder="4.5">
+          </div>
+          <div class="field">
+            <label for="f-reviews">Number of Reviews</label>
+            <input id="f-reviews" name="reviews" type="number" min="0" placeholder="142">
+          </div>
+          <div class="field span-2">
+            <label>Product Image</label>
+            <div class="image-upload-section">
+              <div class="upload-dropzone" id="uploadDropzone">
+                <input type="file" id="f-image-file" accept="image/jpeg,image/png,image/webp,image/gif">
+                <span class="upload-icon">📸</span>
+                <span class="upload-text"><strong>Click to upload</strong> or drag & drop</span>
+                <span class="upload-hint">JPEG, PNG, WebP, GIF · Max 5 MB</span>
+                <div class="upload-progress" id="uploadProgress" hidden>
+                  <div class="upload-progress-bar" id="uploadProgressBar"></div>
+                </div>
+              </div>
+              <div class="image-preview-box" id="imagePreviewBox">
+                <span class="preview-empty">🖼️</span>
+                <button type="button" class="preview-remove" id="previewRemoveBtn" title="Remove image" hidden>✕</button>
+              </div>
+            </div>
+            <div class="or-divider">or paste a URL</div>
+            <input id="f-image-url" name="image_url" type="url" placeholder="https://example.com/product-image.jpg">
+          </div>
+          <div class="field span-2">
+            <label for="f-specs">Specs <span class="hint">(JSON: {"Display":"6.2 inch","Battery":"4000 mAh"})</span></label>
+            <textarea id="f-specs" name="specs" rows="3" placeholder='{"Display": "6.2 inch AMOLED", "Processor": "Snapdragon 8 Gen 2"}'></textarea>
+          </div>
+          <div class="field span-2">
+            <label for="f-delivery">Delivery Note</label>
+            <input id="f-delivery" name="delivery_note" type="text" placeholder="Free delivery in Mehsana within 24 hours">
+          </div>
+          <div class="field">
+            <label for="f-color">Color <span class="hint">(optional — e.g. Midnight Black, Pearl White)</span></label>
+            <input id="f-color" name="color" type="text" placeholder="e.g. Midnight Black, Sky Blue">
+          </div>
+          <div class="field">
+            <label class="checkbox-label">
+              <input id="f-stock" name="stock" type="checkbox" checked>
+              <span>In Stock</span>
+            </label>
+          </div>
+        </div>
+        <div id="formError" class="error-msg" hidden></div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="saveBtn">Save Product</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Products Table -->
+    <section class="card">
+      <div class="card-head">
+        <h2>All Products <span id="productCount" class="badge"></span></h2>
+        <input type="search" id="tableSearch" placeholder="Search table…" class="table-search">
+      </div>
+      <div class="table-wrap">
+        <table id="productsTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Price</th>
+              <th>Stock</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="productsTableBody">
+            <tr><td colspan="6" class="loading-row">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ─── Helpers ─── */
+function escapeHTML(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+const rupee = n => "₹" + Number(n).toLocaleString("en-IN");
+let allProducts = [];
+let toastTimer;
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (isError ? " toast-error" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2800);
+}
+
+/* ─── Session check on load ─── */
+async function checkSession() {
+  try {
+    const res = await fetch("/api/admin/session");
+    const data = await res.json();
+    if (data.loggedIn) showDashboard();
+    else showLogin();
+  } catch { showLogin(); }
+}
+
+function showLogin()    { document.getElementById("loginScreen").hidden = false; document.getElementById("dashboardScreen").hidden = true; }
+function showDashboard(){ document.getElementById("loginScreen").hidden = true;  document.getElementById("dashboardScreen").hidden = false; fetchProducts(); }
+
+/* ─── Login ─── */
+document.getElementById("loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = document.getElementById("loginBtn");
+  const err = document.getElementById("loginError");
+  btn.textContent = "Signing in…"; btn.disabled = true; err.hidden = true;
+  try {
+    const res = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: document.getElementById("username").value,
+        password: document.getElementById("password").value
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Login failed.");
+    showDashboard();
+  } catch (err2) {
+    err.textContent = err2.message; err.hidden = false;
+  } finally { btn.textContent = "Sign In"; btn.disabled = false; }
+});
+
+/* ─── Logout ─── */
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  await fetch("/api/admin/logout", { method: "POST" });
+  showLogin();
+});
+
+/* ─── Fetch & render products ─── */
+async function fetchProducts() {
+  try {
+    const res = await fetch("/api/admin/products");
+    if (!res.ok) throw new Error("Not authorised");
+    allProducts = await res.json();
+    renderTable(allProducts);
+  } catch (err) { showToast("Could not load products. " + err.message, true); }
+}
+
+function renderTable(products) {
+  document.getElementById("productCount").textContent = products.length;
+  const tbody = document.getElementById("productsTableBody");
+  if (!products.length) { tbody.innerHTML = `<tr><td colspan="6" class="loading-row">No products yet.</td></tr>`; return; }
+  const imgThumb = (url) => url ? `<img src="${escapeHTML(url)}" style="width:32px;height:32px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:8px;">` : '';
+  tbody.innerHTML = products.map(p => `
+    <tr>
+      <td class="id-cell">#${p.id}</td>
+      <td class="name-cell">${imgThumb(p.image_url)}${escapeHTML(p.name)}</td>
+      <td><span class="chip chip-${escapeHTML(p.category)}">${escapeHTML(p.category)}</span></td>
+      <td>${rupee(p.price)}</td>
+      <td>${p.stock ? '<span class="badge-green">In Stock</span>' : '<span class="badge-red">Out</span>'}</td>
+      <td class="action-cell">
+        <button class="btn btn-ghost btn-xs" onclick="startEdit(${p.id})">Edit</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteProduct(${p.id})">Delete</button>
+      </td>
+    </tr>`).join("");
+}
+
+/* Table search */
+document.getElementById("tableSearch").addEventListener("input", e => {
+  const q = e.target.value.toLowerCase();
+  renderTable(allProducts.filter(p => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)));
+});
+
+/* ─── Form: save (create or update) ─── */
+document.getElementById("productForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const id      = document.getElementById("editId").value;
+  const errEl   = document.getElementById("formError");
+  const saveBtn = document.getElementById("saveBtn");
+  errEl.hidden  = true;
+  saveBtn.textContent = "Saving…"; saveBtn.disabled = true;
+
+  let specsValue = document.getElementById("f-specs").value.trim();
+  if (!specsValue) specsValue = "{}";
+  try { JSON.parse(specsValue); } catch { errEl.textContent = "Specs field must be valid JSON (e.g. {\"Key\": \"Value\"})."; errEl.hidden = false; saveBtn.textContent = "Save Product"; saveBtn.disabled = false; return; }
+
+  const payload = {
+    name:          document.getElementById("f-name").value.trim(),
+    category:      document.getElementById("f-category").value,
+    price:         Number(document.getElementById("f-price").value),
+    original_price:Number(document.getElementById("f-original-price").value) || null,
+    brand:         document.getElementById("f-brand").value.trim(),
+    rating:        Number(document.getElementById("f-rating").value) || 0,
+    reviews:       Number(document.getElementById("f-reviews").value) || 0,
+    stock:         document.getElementById("f-stock").checked,
+    image_url:     document.getElementById("f-image-url").value.trim(),
+    specs:         specsValue,
+    delivery_note: document.getElementById("f-delivery").value.trim(),
+    color:         document.getElementById("f-color").value.trim()
+  };
+
+  try {
+    const url    = id ? `/api/admin/products/${id}` : "/api/admin/products";
+    const method = id ? "PUT" : "POST";
+    const res    = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const data   = await res.json();
+    if (!res.ok) throw new Error(data.error || "Save failed.");
+    showToast(id ? "✅ Product updated!" : "✅ Product added!");
+    resetForm();
+    fetchProducts();
+  } catch (err2) { errEl.textContent = err2.message; errEl.hidden = false; }
+  finally { saveBtn.textContent = "Save Product"; saveBtn.disabled = false; }
+});
+
+/* ─── Edit ─── */
+function startEdit(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById("formTitle").textContent = "Edit Product";
+  document.getElementById("editId").value = p.id;
+  document.getElementById("f-name").value = p.name;
+  document.getElementById("f-category").value = p.category;
+  document.getElementById("f-brand").value = p.brand;
+  document.getElementById("f-price").value = p.price;
+  document.getElementById("f-original-price").value = p.original_price || "";
+  document.getElementById("f-rating").value = p.rating || "";
+  document.getElementById("f-reviews").value = p.reviews || "";
+  document.getElementById("f-image-url").value = p.image_url || "";
+  updateImagePreview(p.image_url || "");
+  document.getElementById("f-specs").value = typeof p.specs === "object" ? JSON.stringify(p.specs, null, 2) : (p.specs || "{}");
+  document.getElementById("f-delivery").value = p.delivery_note || "";
+  document.getElementById("f-color").value = p.color || "";
+  document.getElementById("f-stock").checked = !!p.stock;
+  document.getElementById("cancelEditBtn").hidden = false;
+  document.getElementById("saveBtn").textContent = "Update Product";
+  document.querySelector(".form-card").scrollIntoView({ behavior: "smooth" });
+}
+
+document.getElementById("cancelEditBtn").addEventListener("click", resetForm);
+function resetForm() {
+  document.getElementById("productForm").reset();
+  document.getElementById("editId").value = "";
+  document.getElementById("formTitle").textContent = "Add New Product";
+  document.getElementById("cancelEditBtn").hidden = true;
+  document.getElementById("saveBtn").textContent = "Save Product";
+  document.getElementById("formError").hidden = true;
+  document.getElementById("f-stock").checked = true;
+  updateImagePreview("");
+}
+
+/* ─── Delete ─── */
+async function deleteProduct(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!confirm(`Delete "${p?.name || id}"? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error((await res.json()).error);
+    showToast("🗑️ Product deleted.");
+    fetchProducts();
+  } catch (err) { showToast("Delete failed: " + err.message, true); }
+}
+
+/* ─── Image Upload Logic ─── */
+const dropzone    = document.getElementById("uploadDropzone");
+const fileInput   = document.getElementById("f-image-file");
+const previewBox  = document.getElementById("imagePreviewBox");
+const removeBtn   = document.getElementById("previewRemoveBtn");
+const urlInput    = document.getElementById("f-image-url");
+const progressEl  = document.getElementById("uploadProgress");
+const progressBar = document.getElementById("uploadProgressBar");
+
+function updateImagePreview(url) {
+  if (url) {
+    previewBox.innerHTML = `<img src="${escapeHTML(url)}" alt="Preview"><button type="button" class="preview-remove" id="previewRemoveBtn" title="Remove image">✕</button>`;
+    previewBox.querySelector(".preview-remove").addEventListener("click", clearImage);
+  } else {
+    previewBox.innerHTML = '<span class="preview-empty">🖼️</span><button type="button" class="preview-remove" id="previewRemoveBtn" title="Remove image" hidden>✕</button>';
+  }
+}
+
+function clearImage() {
+  urlInput.value = "";
+  fileInput.value = "";
+  updateImagePreview("");
+}
+
+async function uploadFile(file) {
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { showToast("File too large (max 5 MB).", true); return; }
+
+  const formData = new FormData();
+  formData.append("image", file);
+
+  dropzone.classList.add("uploading");
+  progressEl.hidden = false;
+  progressBar.style.width = "0%";
+
+  try {
+    const xhr = new XMLHttpRequest();
+    const result = await new Promise((resolve, reject) => {
+      xhr.upload.addEventListener("progress", e => {
+        if (e.lengthComputable) progressBar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+      });
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+        else reject(new Error(JSON.parse(xhr.responseText).error || "Upload failed."));
+      });
+      xhr.addEventListener("error", () => reject(new Error("Network error during upload.")));
+      xhr.open("POST", "/api/admin/upload");
+      xhr.send(formData);
+    });
+
+    urlInput.value = result.url;
+    updateImagePreview(result.url);
+    showToast("📸 Image uploaded!");
+  } catch (err) {
+    showToast("Upload failed: " + err.message, true);
+  } finally {
+    dropzone.classList.remove("uploading");
+    setTimeout(() => { progressEl.hidden = true; progressBar.style.width = "0%"; }, 600);
+  }
+}
+
+fileInput.addEventListener("change", e => { if (e.target.files[0]) uploadFile(e.target.files[0]); });
+
+["dragenter", "dragover"].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add("drag-over"); }));
+["dragleave", "drop"].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove("drag-over"); }));
+dropzone.addEventListener("drop", e => { if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]); });
+
+urlInput.addEventListener("change", () => updateImagePreview(urlInput.value.trim()));
+urlInput.addEventListener("blur",   () => updateImagePreview(urlInput.value.trim()));
+
+checkSession();
+</script>
+</body>
+</html>
