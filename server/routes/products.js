@@ -1,11 +1,13 @@
-﻿const router     = require("express").Router();
+const router     = require("express").Router();
 const { getAllProducts, getProductById } = require("../db/database");
 
-/* GET /api/products?category=mobiles&search=samsung */
-router.get("/", (req, res) => {
+/* GET /api/products?category=mobiles&search=samsung
+   Optional: ?page=1&limit=48 for server-side pagination.
+   Without page/limit the full catalog is returned (current storefront default). */
+router.get("/", async (req, res) => {
   try {
-    const { category, search } = req.query;
-    const products = getAllProducts({ category, search });
+    const { category, search, page, limit } = req.query;
+    const products = await getAllProducts({ category, search, page, limit });
     res.json(products);
   } catch (err) {
     console.error(err);
@@ -14,9 +16,9 @@ router.get("/", (req, res) => {
 });
 
 /* GET /api/products/:id */
-router.get("/:id", (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
-    const product = getProductById(req.params.id);
+    const product = await getProductById(req.params.id);
     if (!product) return res.status(404).json({ error: "Product not found." });
     res.json(product);
   } catch (err) {

@@ -2,7 +2,7 @@ require("dotenv").config();
 const express    = require("express");
 const session    = require("express-session");
 const path       = require("path");
-const { initDB } = require("./db/database");
+const { initDB, pool } = require("./db/database");
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -14,12 +14,13 @@ app.disable("x-powered-by");
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: true }));
 
-/* ── Sessions ── */
-const SQLiteStore = require("connect-sqlite3")(session);
+/* ── Sessions (PostgreSQL-backed — survives server restarts) ── */
+const pgSession = require("connect-pg-simple")(session);
 app.use(session({
-  store: new SQLiteStore({
-    db:  "sessions.db",
-    dir: path.join(__dirname, "../database")
+  store: new pgSession({
+    pool,                      // reuse the same connection pool as the rest of the app
+    tableName: "session",      // default table name used by connect-pg-simple
+    createTableIfMissing: true // creates the session table automatically if needed
   }),
   secret:            process.env.SESSION_SECRET || "dev-secret-change-me",
   resave:            false,

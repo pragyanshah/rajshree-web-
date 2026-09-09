@@ -1,12 +1,13 @@
 const router      = require("express").Router();
 const bcrypt      = require("bcryptjs");
 const multer      = require("multer");
-const path        = require("path");
-const fs          = require("fs");
 const { requireAuth } = require("../middleware/auth");
-const { getAllProducts, getProductById, createProduct, updateProduct, deleteProduct, getPasswordHash, setPasswordHash } = require("../db/database");
+const {
+  getAllProducts, getProductById, createProduct, updateProduct,
+  deleteProduct, getPasswordHash, setPasswordHash, clearAllSessions
+} = require("../db/database");
 
-/* ─── Shared product input validation ─── */
+/* ─── Shared product input validation ────────────────────────────────────── */
 function validateProductFields(body) {
   const { name, category, brand, price, original_price, delivery_note } = body;
 
@@ -33,7 +34,7 @@ function validateProductFields(body) {
   return null; // no error
 }
 
-/* ─── Cloudinary setup ─── */
+/* ─── Cloudinary setup ───────────────────────────────────────────────────── */
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
@@ -46,10 +47,10 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder:         "rajshree-electronics",
+    folder:          "rajshree-electronics",
     allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
-    transformation: [{ width: 800, height: 800, crop: "limit", quality: "auto" }],
-    public_id: (_req, file) => {
+    transformation:  [{ width: 800, height: 800, crop: "limit", quality: "auto" }],
+    public_id: (_req, _file) => {
       const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e6);
       return `product-${uniqueSuffix}`;
     }
@@ -66,9 +67,9 @@ const upload = multer({
   }
 });
 
-const rateLimit    = require("express-rate-limit");
+const rateLimit = require("express-rate-limit");
 
-/* ─── Rate limiter for admin login (5 attempts per 15 minutes per IP) ─── */
+/* ─── Rate limiter: login (5 attempts per 15 minutes per IP) ─────────────── */
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -77,7 +78,7 @@ const loginLimiter = rateLimit({
   message: { error: "Too many login attempts. Please try again after 15 minutes." }
 });
 
-/* ─── Rate limiter for change-password (5 attempts per 15 minutes per IP) ─── */
+/* ─── Rate limiter: change-password (5 attempts per 15 minutes per IP) ───── */
 const changePwLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -86,12 +87,12 @@ const changePwLimiter = rateLimit({
   message: { error: "Too many password-change attempts. Please try again after 15 minutes." }
 });
 
-/* ─── POST /api/admin/login ─── */
+/* ─── POST /api/admin/login ──────────────────────────────────────────────── */
 router.post("/login", loginLimiter, async (req, res) => {
   const { username, password } = req.body;
   const expectedUser = process.env.ADMIN_USERNAME || "admin";
 
-  const hashInDB = getPasswordHash();
+  const hashInDB = await getPasswordHash();
   if (!hashInDB) {
     return res.status(500).json({ error: "Admin password not configured. Please set up a password first." });
   }
@@ -105,20 +106,20 @@ router.post("/login", loginLimiter, async (req, res) => {
   res.json({ ok: true });
 });
 
-/* ─── POST /api/admin/logout ─── */
+/* ─── POST /api/admin/logout ─────────────────────────────────────────────── */
 router.post("/logout", (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
-/* ─── GET /api/admin/session ─── (check if still logged in) */
+/* ─── GET /api/admin/session ─────────────────────────────────────────────── */
 router.get("/session", (req, res) => {
   res.json({ loggedIn: req.session.admin === true });
 });
 
-/* ─── All routes below require auth ─── */
+/* ─── All routes below require auth ──────────────────────────────────────── */
 router.use(requireAuth);
 
-/* ─── POST /api/admin/change-password ─── */
+/* ─── POST /api/admin/change-password ───────────────────────────────────── */
 router.post("/change-password", changePwLimiter, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
@@ -129,7 +130,7 @@ router.post("/change-password", changePwLimiter, async (req, res) => {
     return res.status(400).json({ error: "New password must be at least 8 characters long." });
   }
 
-  const currentHash = getPasswordHash();
+  const currentHash = await getPasswordHash();
   if (!currentHash) {
     return res.status(500).json({ error: "Could not retrieve current password. Please contact support." });
   }
@@ -140,32 +141,22 @@ router.post("/change-password", changePwLimiter, async (req, res) => {
   }
 
   const newHash = await bcrypt.hash(newPassword, 10);
-  setPasswordHash(newHash);
+  await setPasswordHash(newHash);
 
-  /* Invalidate all existing sessions so stolen/old sessions can't be reused.
-     connect-sqlite3 stores sessions in database/sessions.db in a table called
-     "sessions". We open it with sql.js (already a project dependency), clear
-     every row, save, then destroy the current in-memory session. */
+  /* Invalidate all existing sessions — now a single pg DELETE via the pool */
   try {
-    const sessDbPath = path.join(__dirname, "../../database/sessions.db");
-    if (fs.existsSync(sessDbPath)) {
-      const SQL = await require("sql.js")();
-      const sessDb = new SQL.Database(fs.readFileSync(sessDbPath));
-      sessDb.run("DELETE FROM sessions");
-      fs.writeFileSync(sessDbPath, Buffer.from(sessDb.export()));
-      sessDb.close();
-    }
+    await clearAllSessions();
   } catch (e) {
     console.warn("Could not clear session store:", e.message);
   }
 
-  /* Destroy the current session; the client will need to log in with the new password */
+  /* Destroy the current in-memory session; client must log in with new password */
   req.session.destroy(() => {
     res.json({ ok: true, message: "Password changed successfully. Please sign in again with your new password." });
   });
 });
 
-/* ─── POST /api/admin/upload ─── (image upload → Cloudinary) */
+/* ─── POST /api/admin/upload ─────────────────────────────────────────────── */
 router.post("/upload", (req, res) => {
   upload.single("image")(req, res, (err) => {
     if (err) {
@@ -181,18 +172,21 @@ router.post("/upload", (req, res) => {
   });
 });
 
-/* ─── GET /api/admin/products ─── */
-router.get("/products", (_req, res) => {
-  try { res.json(getAllProducts()); }
-  catch (err) { res.status(500).json({ error: err.message }); }
+/* ─── GET /api/admin/products ────────────────────────────────────────────── */
+router.get("/products", async (_req, res) => {
+  try {
+    res.json(await getAllProducts());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-/* ─── POST /api/admin/products ─── */
-router.post("/products", (req, res) => {
+/* ─── POST /api/admin/products ───────────────────────────────────────────── */
+router.post("/products", async (req, res) => {
   const validationError = validateProductFields(req.body);
   if (validationError) return res.status(400).json({ error: validationError });
   try {
-    const product = createProduct(req.body);
+    const product = await createProduct(req.body);
     res.status(201).json(product);
   } catch (err) {
     console.warn("Product create error:", err.message);
@@ -200,14 +194,14 @@ router.post("/products", (req, res) => {
   }
 });
 
-/* ─── PUT /api/admin/products/:id ─── */
-router.put("/products/:id", (req, res) => {
+/* ─── PUT /api/admin/products/:id ────────────────────────────────────────── */
+router.put("/products/:id", async (req, res) => {
   const validationError = validateProductFields(req.body);
   if (validationError) return res.status(400).json({ error: validationError });
   try {
-    const existing = getProductById(req.params.id);
+    const existing = await getProductById(req.params.id);
     if (!existing) return res.status(404).json({ error: "Product not found." });
-    const product = updateProduct(req.params.id, req.body);
+    const product = await updateProduct(req.params.id, req.body);
     res.json(product);
   } catch (err) {
     console.warn("Product update error:", err.message);
@@ -215,14 +209,16 @@ router.put("/products/:id", (req, res) => {
   }
 });
 
-/* ─── DELETE /api/admin/products/:id ─── */
-router.delete("/products/:id", (req, res) => {
+/* ─── DELETE /api/admin/products/:id ─────────────────────────────────────── */
+router.delete("/products/:id", async (req, res) => {
   try {
-    const existing = getProductById(req.params.id);
+    const existing = await getProductById(req.params.id);
     if (!existing) return res.status(404).json({ error: "Product not found." });
-    deleteProduct(req.params.id);
+    await deleteProduct(req.params.id);
     res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
