@@ -14,3 +14,8 @@ CREATE TABLE IF NOT EXISTS products (
   color          TEXT    DEFAULT "",
   created_at     TEXT
 );
+
+CREATE TABLE IF NOT EXISTS admin_settings (
+  id            INTEGER PRIMARY KEY CHECK (id = 1),
+  password_hash TEXT    NOT NULL
+);

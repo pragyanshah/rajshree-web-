@@ -7,8 +7,11 @@ const { initDB } = require("./db/database");
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+/* ── Security hardening ── */
+app.disable("x-powered-by");
+
 /* ── Body parsing ── */
-app.use(express.json());
+app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* ── Sessions ── */
@@ -21,7 +24,11 @@ app.use(session({
   secret:            process.env.SESSION_SECRET || "dev-secret-change-me",
   resave:            false,
   saveUninitialized: false,
-  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 } // 7 days
+  cookie: {
+    maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days
+    sameSite: "strict",
+    secure:   process.env.NODE_ENV === "production"
+  }
 }));
 
 /* ── API Routes ── */

@@ -108,6 +108,20 @@ async function initDB() {
     console.log("  ✅ Seed complete.");
   }
 
+  // Seed admin_settings from .env if the table is empty (migration step)
+  const settingsCount = db.exec("SELECT COUNT(*) AS n FROM admin_settings");
+  const sCount = settingsCount[0]?.values[0][0] ?? 0;
+  if (Number(sCount) === 0) {
+    const hashFromEnv = process.env.ADMIN_PASSWORD_HASH || "";
+    if (hashFromEnv) {
+      db.run("INSERT INTO admin_settings (id, password_hash) VALUES (1, ?)", [hashFromEnv]);
+      save();
+      console.log("  🔑 Admin password hash migrated from .env into database.");
+    } else {
+      console.warn("  ⚠️  ADMIN_PASSWORD_HASH not set in .env — admin login will not work until a password is configured.");
+    }
+  }
+
   console.log("  🗄️  Database ready.");
 }
 
@@ -148,4 +162,14 @@ function deleteProduct(id) {
   save();
 }
 
-module.exports = { initDB, getAllProducts, getProductById, createProduct, updateProduct, deleteProduct };
+/* ─── Admin settings ─── */
+function getPasswordHash() {
+  const row = queryOne("SELECT password_hash FROM admin_settings WHERE id = 1");
+  return row ? row.password_hash : null;
+}
+
+function setPasswordHash(newHash) {
+  runStmt("UPDATE admin_settings SET password_hash = ? WHERE id = 1", [newHash]);
+}
+
+module.exports = { initDB, getAllProducts, getProductById, createProduct, updateProduct, deleteProduct, getPasswordHash, setPasswordHash };

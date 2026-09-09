@@ -138,6 +138,37 @@
       </form>
     </section>
 
+    <!-- Change Password Section -->
+    <section class="card" id="changePasswordSection">
+      <div class="card-head" id="changePasswordToggle" style="cursor:pointer;user-select:none;" title="Click to expand / collapse">
+        <h2 style="display:flex;align-items:center;gap:8px;">
+          <span>&#128272;</span> Change Password
+        </h2>
+        <span id="changePasswordChevron" style="font-size:18px;color:#6b7a8d;transition:transform 0.2s;">&#9660;</span>
+      </div>
+      <div id="changePasswordBody" style="display:none;padding:22px;">
+        <form id="changePasswordForm" autocomplete="off" style="max-width:400px;display:flex;flex-direction:column;gap:16px;">
+          <div class="field">
+            <label for="cp-current">Current Password</label>
+            <input id="cp-current" name="currentPassword" type="password" autocomplete="current-password" required placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;">
+          </div>
+          <div class="field">
+            <label for="cp-new">New Password</label>
+            <input id="cp-new" name="newPassword" type="password" autocomplete="new-password" required placeholder="At least 8 characters">
+          </div>
+          <div class="field">
+            <label for="cp-confirm">Confirm New Password</label>
+            <input id="cp-confirm" name="confirmPassword" type="password" autocomplete="new-password" required placeholder="Repeat new password">
+          </div>
+          <div id="cpError" class="error-msg" hidden></div>
+          <div id="cpSuccess" style="background:#e6f9f0;color:#1B8A5A;border:1px solid #a3e4c1;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;" hidden></div>
+          <div>
+            <button type="submit" class="btn btn-primary" id="cpSaveBtn">Update Password</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
     <!-- Products Table -->
     <section class="card">
       <div class="card-head">
@@ -429,6 +460,60 @@ urlInput.addEventListener("change", () => updateImagePreview(urlInput.value.trim
 urlInput.addEventListener("blur",   () => updateImagePreview(urlInput.value.trim()));
 
 checkSession();
+
+/* ─── Change Password ─── */
+const cpToggle   = document.getElementById("changePasswordToggle");
+const cpBody     = document.getElementById("changePasswordBody");
+const cpChevron  = document.getElementById("changePasswordChevron");
+
+cpToggle.addEventListener("click", () => {
+  const open = cpBody.style.display !== "none";
+  cpBody.style.display   = open ? "none" : "block";
+  cpChevron.style.transform = open ? "" : "rotate(180deg)";
+});
+
+document.getElementById("changePasswordForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const cpErr  = document.getElementById("cpError");
+  const cpOk   = document.getElementById("cpSuccess");
+  const cpBtn  = document.getElementById("cpSaveBtn");
+  cpErr.hidden = true;
+  cpOk.hidden  = true;
+
+  const currentPassword = document.getElementById("cp-current").value;
+  const newPassword     = document.getElementById("cp-new").value;
+  const confirmPassword = document.getElementById("cp-confirm").value;
+
+  if (newPassword !== confirmPassword) {
+    cpErr.textContent = "New password and confirmation do not match. Please try again.";
+    cpErr.hidden = false;
+    return;
+  }
+
+  cpBtn.textContent = "Updating…";
+  cpBtn.disabled    = true;
+
+  try {
+    const res  = await fetch("/api/admin/change-password", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ currentPassword, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Something went wrong.");
+    cpOk.textContent = "✅ Password changed successfully! Signing you out — please log in with your new password.";
+    cpOk.hidden      = false;
+    document.getElementById("changePasswordForm").reset();
+    /* Session was invalidated server-side, redirect to login after a short delay */
+    setTimeout(() => showLogin(), 2000);
+  } catch (err2) {
+    cpErr.textContent = err2.message;
+    cpErr.hidden      = false;
+  } finally {
+    cpBtn.textContent = "Update Password";
+    cpBtn.disabled    = false;
+  }
+});
 </script>
 </body>
 </html>
