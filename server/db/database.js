@@ -182,23 +182,32 @@ async function initDB() {
     console.log("  ✅ Seed complete.");
   }
 
-  // ── Step 4: Seed admin password from .env if not yet stored in DB.
+  // ── Step 4: Seed admin password from .env ONLY on a completely fresh database.
+  //    If a row already exists (even from a previous deploy) we leave it alone
+  //    and do NOT overwrite it with the .env value — that would silently reset
+  //    any password change the user made through the in-app UI.
   const { rows: [{ n: settingsCount }] } = await pool.query(
     "SELECT COUNT(*) AS n FROM admin_settings"
   );
   if (Number(settingsCount) === 0) {
+    // Truly empty — first ever startup. Seed from .env.
     const hashFromEnv = process.env.ADMIN_PASSWORD_HASH || "";
     if (hashFromEnv) {
       await pool.query(
         "INSERT INTO admin_settings (id, password_hash) VALUES (1, $1)",
         [hashFromEnv]
       );
-      console.log("  🔑 Admin password hash migrated from .env into database.");
+      console.log("  🔑 Admin password seeded from ADMIN_PASSWORD_HASH in .env (first-run only).");
+      console.log("  ⚠️  Change this password via the admin panel or run:");
+      console.log("      node server/reset-admin-password.js <NewPassword>");
     } else {
-      console.warn(
-        "  ⚠️  ADMIN_PASSWORD_HASH not set in .env — admin login will not work until a password is configured."
-      );
+      console.warn("  ⚠️  No admin_settings row found and ADMIN_PASSWORD_HASH is not set in .env.");
+      console.warn("      Admin login will not work until you run:");
+      console.warn("      node server/reset-admin-password.js <YourPassword>");
     }
+  } else {
+    // Row exists — leave it untouched. Never silently overwrite with .env value.
+    console.log("  🔑 Admin password loaded from database (not overwritten by .env).");
   }
 
   console.log("  🗄️  Database ready.");
