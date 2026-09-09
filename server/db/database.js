@@ -216,8 +216,14 @@ async function getAllProducts({ category, search, page, limit } = {}) {
     params.push(category.toLowerCase());
   }
   if (search) {
-    sql += ` AND LOWER(name) LIKE $${p++}`;
-    params.push(`%${search.toLowerCase()}%`);
+    // Escape literal % and _ so they match as plain characters, not SQL wildcards.
+    // PostgreSQL's ESCAPE '\\' tells the engine to treat \% and \_ as literals.
+    const escapedSearch = search.toLowerCase()
+      .replace(/\\/g, "\\\\")
+      .replace(/%/g,  "\\%")
+      .replace(/_/g,  "\\_");
+    sql += ` AND LOWER(name) LIKE $${p++} ESCAPE '\\'`;
+    params.push(`%${escapedSearch}%`);
   }
 
   sql += " ORDER BY id ASC";
@@ -237,9 +243,15 @@ async function getAllProducts({ category, search, page, limit } = {}) {
 }
 
 async function getProductById(id) {
+  // Guard against non-numeric IDs (e.g. /api/products/abc) — return null
+  // immediately rather than passing NaN to PostgreSQL, which would cause a
+  // confusing error instead of a clean 404.
+  const numId = Number(id);
+  if (!Number.isInteger(numId) || numId <= 0) return null;
+
   const result = await pool.query(
     "SELECT * FROM products WHERE id = $1",
-    [Number(id)]
+    [numId]
   );
   return parseProduct(result.rows[0] ?? null);
 }
