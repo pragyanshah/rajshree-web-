@@ -169,6 +169,50 @@
       </div>
     </section>
 
+    <!-- ══ Bulk Import Section ══ -->
+    <section class="card" id="bulkImportSection">
+      <div class="card-head" id="bulkImportToggle" style="cursor:pointer;user-select:none;" title="Click to expand / collapse">
+        <h2 style="display:flex;align-items:center;gap:8px;">
+          <span>📥</span> Bulk Import Products
+        </h2>
+        <span id="bulkImportChevron" style="font-size:18px;color:#6b7a8d;transition:transform 0.2s;">&#9660;</span>
+      </div>
+      <div id="bulkImportBody" style="display:none;padding:22px;">
+        <!-- Instructions + template download -->
+        <div style="background:#f0f6ff;border:1px solid #ccdeff;border-radius:10px;padding:16px 20px;margin-bottom:20px;font-size:13.5px;line-height:1.7;color:#2c3e50;">
+          <strong>How to use:</strong>
+          <ol style="margin:8px 0 10px 18px;padding:0;">
+            <li>Download the CSV template below and open it in Excel or Google Sheets.</li>
+            <li>Fill in your products — one row per product.</li>
+            <li>For <strong>specs</strong>, use the format: <code style="background:#e8efff;padding:1px 5px;border-radius:4px;">Display:6.2 inch;RAM:8GB;Battery:4000 mAh</code></li>
+            <li>For <strong>stock</strong>, type <code style="background:#e8efff;padding:1px 5px;border-radius:4px;">true</code> or <code style="background:#e8efff;padding:1px 5px;border-radius:4px;">false</code>.</li>
+            <li>Save as <strong>.csv</strong> and upload below.</li>
+          </ol>
+          <a id="downloadTemplateBtn" href="/api/admin/template.csv" download="rajshree-products-template.csv"
+             class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;">
+            ⬇️ Download CSV Template
+          </a>
+        </div>
+
+        <!-- Upload area -->
+        <div id="csvDropzone" style="border:2px dashed #c3cfe2;border-radius:12px;padding:30px 20px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;background:#fafbfc;">
+          <div style="font-size:32px;margin-bottom:8px;">📄</div>
+          <p style="margin:0 0 6px;font-weight:600;color:#3a4a5c;">Click to select your CSV file</p>
+          <p style="margin:0;font-size:12px;color:#8492a6;">or drag &amp; drop here · Max 10 MB</p>
+          <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display:none;">
+        </div>
+        <div id="csvFileName" style="margin-top:8px;font-size:13px;color:#5a6a7a;display:none;"></div>
+
+        <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+          <button id="csvImportBtn" class="btn btn-primary" disabled>Import Products</button>
+          <span id="csvImportSpinner" style="display:none;font-size:13px;color:#5a6a7a;">⏳ Importing…</span>
+        </div>
+
+        <!-- Results -->
+        <div id="bulkImportResult" style="display:none;margin-top:20px;"></div>
+      </div>
+    </section>
+
     <!-- Products Table -->
     <section class="card">
       <div class="card-head">
@@ -512,6 +556,100 @@ document.getElementById("changePasswordForm").addEventListener("submit", async e
   } finally {
     cpBtn.textContent = "Update Password";
     cpBtn.disabled    = false;
+  }
+});
+/* ─── Bulk Import ─── */
+const biToggle   = document.getElementById("bulkImportToggle");
+const biBody     = document.getElementById("bulkImportBody");
+const biChevron  = document.getElementById("bulkImportChevron");
+const csvDropzone   = document.getElementById("csvDropzone");
+const csvFileInput  = document.getElementById("csvFileInput");
+const csvImportBtn  = document.getElementById("csvImportBtn");
+const csvSpinner    = document.getElementById("csvImportSpinner");
+const csvFileName   = document.getElementById("csvFileName");
+const biResult      = document.getElementById("bulkImportResult");
+let   selectedCSV   = null;
+
+// Collapse / expand
+biToggle.addEventListener("click", () => {
+  const open = biBody.style.display !== "none";
+  biBody.style.display     = open ? "none" : "block";
+  biChevron.style.transform = open ? "" : "rotate(180deg)";
+});
+
+// Dropzone click -> open file picker
+csvDropzone.addEventListener("click", () => csvFileInput.click());
+
+// Drag styling
+["dragenter","dragover"].forEach(ev => csvDropzone.addEventListener(ev, e => {
+  e.preventDefault(); csvDropzone.style.borderColor = "#4a90e2"; csvDropzone.style.background = "#eef5ff";
+}));
+["dragleave","drop"].forEach(ev => csvDropzone.addEventListener(ev, e => {
+  e.preventDefault(); csvDropzone.style.borderColor = "#c3cfe2"; csvDropzone.style.background = "#fafbfc";
+}));
+csvDropzone.addEventListener("drop", e => {
+  const file = e.dataTransfer.files[0];
+  if (file) setCSVFile(file);
+});
+
+csvFileInput.addEventListener("change", e => {
+  if (e.target.files[0]) setCSVFile(e.target.files[0]);
+});
+
+function setCSVFile(file) {
+  if (!file.name.endsWith(".csv") && file.type !== "text/csv") {
+    showToast("Please select a .csv file.", true); return;
+  }
+  selectedCSV = file;
+  csvFileName.textContent = `\uD83D\uDCC4 ${file.name}  (${(file.size / 1024).toFixed(1)} KB)`;
+  csvFileName.style.display = "block";
+  csvImportBtn.disabled = false;
+  biResult.style.display = "none";
+}
+
+csvImportBtn.addEventListener("click", async () => {
+  if (!selectedCSV) return;
+  csvImportBtn.disabled = true;
+  csvSpinner.style.display = "inline";
+  biResult.style.display   = "none";
+
+  const formData = new FormData();
+  formData.append("csv", selectedCSV);
+
+  try {
+    const res  = await fetch("/api/admin/products/bulk-import", { method: "POST", body: formData });
+    const data = await res.json();
+
+    if (!res.ok) {
+      biResult.innerHTML = `<div style="background:#fff0f0;border:1px solid #f5c6cb;border-radius:10px;padding:16px 20px;color:#c0392b;">
+        <strong>\u274C Import failed:</strong> ${escapeHTML(data.error || "Unknown error")}
+      </div>`;
+    } else {
+      const skippedHTML = data.skipped.length
+        ? `<div style="margin-top:12px;">
+            <strong>\u26A0\uFE0F ${data.skipped.length} row${data.skipped.length > 1 ? "s" : ""} skipped:</strong>
+            <ul style="margin:8px 0 0 18px;font-size:13px;color:#7f5b00;">
+              ${data.skipped.map(r => `<li>${escapeHTML(r)}</li>`).join("")}
+            </ul>
+           </div>`
+        : "<p style='margin:6px 0 0;font-size:13px;color:#555;'>All rows imported successfully \u2014 no rows were skipped.</p>";
+
+      biResult.innerHTML = `
+        <div style="background:#e9f9f0;border:1px solid #a3e4c1;border-radius:10px;padding:16px 20px;">
+          <div style="font-size:16px;font-weight:700;color:#1B8A5A;">\u2705 ${data.added} product${data.added !== 1 ? "s" : ""} imported successfully!</div>
+          ${skippedHTML}
+        </div>`;
+
+      if (data.added > 0) fetchProducts(); // refresh product table
+    }
+  } catch (err) {
+    biResult.innerHTML = `<div style="background:#fff0f0;border:1px solid #f5c6cb;border-radius:10px;padding:16px 20px;color:#c0392b;">
+      <strong>\u274C Network error:</strong> ${escapeHTML(err.message)}
+    </div>`;
+  } finally {
+    biResult.style.display = "block";
+    csvSpinner.style.display = "none";
+    csvImportBtn.disabled    = false;
   }
 });
 </script>

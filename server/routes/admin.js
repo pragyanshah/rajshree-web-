@@ -221,4 +221,203 @@ router.delete("/products/:id", async (req, res) => {
   }
 });
 
+/* ─── GET /api/admin/template.csv ───────────────────────────────────────── */
+router.get("/template.csv", (_req, res) => {
+  const headers = "name,category,price,original_price,brand,rating,reviews,stock,image_url,specs,delivery_note,color";
+  const ex1 = [
+    '"Samsung Galaxy S24 5G (256GB, Onyx Black)"',
+    'mobiles',
+    '74999',
+    '79999',
+    'Samsung',
+    '4.8',
+    '142',
+    'true',
+    'https://res.cloudinary.com/example/image/upload/product-1.jpg',
+    '"Display:6.2 inch AMOLED;Processor:Exynos 2400;RAM:8GB;Battery:4000 mAh"',
+    '"Free delivery in Mehsana within 24 hours"',
+    'Onyx Black'
+  ].join(",");
+  const ex2 = [
+    '"HP 15s Intel Core i5 (16GB/512GB SSD)"',
+    'laptops',
+    '52990',
+    '59990',
+    'HP',
+    '4.7',
+    '64',
+    'true',
+    '',
+    '"Processor:Core i5-1235U;RAM:16GB DDR4;Storage:512GB NVMe SSD;OS:Windows 11"',
+    '"Free unboxing and setup at your home"',
+    'Silver'
+  ].join(",");
+  const ex3 = [
+    '"Sony WH-1000XM5 Wireless Headphones"',
+    'audio',
+    '24990',
+    '31990',
+    'Sony',
+    '4.9',
+    '188',
+    'false',
+    '',
+    '"ANC:Industry-leading;Battery:30 hours;Charging:USB-C"',
+    '"Available in-store today"',
+    'Black'
+  ].join(",");
+
+  const csv = [headers, ex1, ex2, ex3].join("\r\n");
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", 'attachment; filename="rajshree-products-template.csv"');
+  res.send(csv);
+});
+
+/* ─── POST /api/admin/products/bulk-import ───────────────────────────────── */
+// Uses multer with in-memory storage — no temp files on disk.
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 10 * 1024 * 1024 }, // 10 MB max
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === "text/csv" || file.originalname.endsWith(".csv"))
+      cb(null, true);
+    else
+      cb(new Error("Only CSV files are allowed."));
+  }
+});
+
+/**
+ * Minimal CSV parser that handles:
+ *  - Comma-delimited fields
+ *  - Fields wrapped in double-quotes (including quoted fields containing commas)
+ *  - Escaped double-quotes inside quoted fields ("")
+ * Returns array of string arrays (rows × columns).
+ */
+function parseCSV(text) {
+  const rows   = [];
+  const lines  = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const fields = [];
+    let cur = "", inQ = false, i = 0;
+    while (i < line.length) {
+      const ch = line[i];
+      if (inQ) {
+        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i += 2; continue; } // escaped quote
+        if (ch === '"') { inQ = false; i++; continue; }                          // closing quote
+        cur += ch;
+      } else {
+        if (ch === '"') { inQ = true; i++; continue; }  // opening quote
+        if (ch === ',')  { fields.push(cur); cur = ""; i++; continue; }  // delimiter
+        cur += ch;
+      }
+      i++;
+    }
+    fields.push(cur); // last field
+    rows.push(fields);
+  }
+  return rows;
+}
+
+/**
+ * Parse spec string like "Display:6.2 inch;RAM:8GB" into {Display:"6.2 inch", RAM:"8GB"}
+ * Accepts existing JSON strings too.
+ */
+function parseSpecs(raw) {
+  if (!raw || !raw.trim()) return {};
+  // If it already looks like JSON, parse it directly
+  if (raw.trim().startsWith("{")) {
+    try { return JSON.parse(raw); } catch { /* fall through to key:value parse */ }
+  }
+  const obj = {};
+  raw.split(";").forEach(pair => {
+    const idx = pair.indexOf(":");
+    if (idx < 1) return;
+    const key = pair.substring(0, idx).trim();
+    const val = pair.substring(idx + 1).trim();
+    if (key) obj[key] = val;
+  });
+  return obj;
+}
+
+router.post("/products/bulk-import", (req, res) => {
+  csvUpload.single("csv")(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ error: err instanceof multer.MulterError
+        ? (err.code === "LIMIT_FILE_SIZE" ? "CSV file too large (max 10 MB)." : err.message)
+        : err.message
+      });
+    }
+    if (!req.file) return res.status(400).json({ error: "No CSV file provided." });
+
+    const text  = req.file.buffer.toString("utf8");
+    const rows  = parseCSV(text);
+    if (rows.length < 2) {
+      return res.status(400).json({ error: "CSV must have a header row and at least one data row." });
+    }
+
+    // Build column index from header row
+    const EXPECTED = ["name","category","price","original_price","brand",
+                      "rating","reviews","stock","image_url","specs",
+                      "delivery_note","color"];
+    const headerRow = rows[0].map(h => h.trim().toLowerCase());
+    const colIdx    = {};
+    EXPECTED.forEach(col => { colIdx[col] = headerRow.indexOf(col); });
+
+    const missingRequired = ["name","category","price","brand"]
+      .filter(c => colIdx[c] === -1);
+    if (missingRequired.length) {
+      return res.status(400).json({
+        error: `CSV is missing required columns: ${missingRequired.join(", ")}. ` +
+               `Please download the template and check your file.`
+      });
+    }
+
+    const col = (row, name) => {
+      const idx = colIdx[name];
+      return idx === -1 ? "" : (row[idx] || "").trim();
+    };
+
+    let added = 0;
+    const skipped = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const row     = rows[i];
+      const rowNum  = i + 1; // 1-indexed, row 1 = header
+      if (row.every(cell => !cell.trim())) continue; // skip blank rows
+
+      const data = {
+        name:           col(row, "name"),
+        category:       col(row, "category"),
+        price:          col(row, "price"),
+        original_price: col(row, "original_price") || "",
+        brand:          col(row, "brand"),
+        rating:         col(row, "rating") || 0,
+        reviews:        col(row, "reviews") || 0,
+        stock:          col(row, "stock").toLowerCase() !== "false",
+        image_url:      col(row, "image_url") || "",
+        specs:          JSON.stringify(parseSpecs(col(row, "specs"))),
+        delivery_note:  col(row, "delivery_note") || "Usually delivered in 1-2 days",
+        color:          col(row, "color") || ""
+      };
+
+      // Reuse the same validation already used for single-product creation
+      const validationError = validateProductFields(data);
+      if (validationError) {
+        skipped.push(`Row ${rowNum}: ${validationError}`);
+        continue;
+      }
+
+      try {
+        await createProduct(data);
+        added++;
+      } catch (dbErr) {
+        skipped.push(`Row ${rowNum}: Database error — ${dbErr.message}`);
+      }
+    }
+
+    res.json({ ok: true, added, skipped });
+  });
+});
+
 module.exports = router;
