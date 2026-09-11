@@ -384,7 +384,7 @@
   /* ============ DRAWERS / MODAL / TOAST ============ */
   .overlay-bg{
     position:fixed; inset:0; background:rgba(10,51,53,0.35);
-    backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+    /* backdrop-filter intentionally omitted — it blurs ALL page content on mobile */
     opacity:0; pointer-events:none; transition:opacity .3s var(--ease-out); z-index:99;
   }
   .overlay-bg.show{ opacity:1; pointer-events:auto; }
@@ -427,8 +427,23 @@
   .cart-total-row{ display:flex; justify-content:space-between; font-size:15px; margin-bottom:16px; align-items:center; }
   .cart-total-row strong{ font-family:var(--font-display); font-size:20px; color:var(--teal-900); }
 
-  .filters-drawer{ position:fixed; left:0; right:0; bottom:0; top:auto; width:100%; max-width:none; height:auto; max-height:85vh; border-radius:var(--radius-lg) var(--radius-lg) 0 0; transform:translateY(100%); }
+  /* Filters bottom-sheet — always uses transform-based show/hide (same pattern as cart drawer) */
+  .filters-drawer{
+    position:fixed; left:0; right:0; bottom:0; top:auto; width:100%; max-width:none;
+    height:auto; max-height:85vh; overflow-y:auto;
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    transform:translateY(100%); transition:transform .35s var(--ease-out);
+    z-index:101; box-shadow:var(--shadow-xl);
+    background:var(--surface);
+    /* ensure it's always in the DOM flow so the transition works */
+    display:block !important;
+  }
   .filters-drawer.show{ transform:translateY(0); }
+  /* Close handle at top of filter drawer */
+  .filters-drawer-handle{
+    width:40px; height:4px; background:var(--border); border-radius:2px;
+    margin:12px auto 4px; flex-shrink:0;
+  }
 
   .modal{
     position:fixed; top:50%; left:50%; transform:translate(-50%,-48%) scale(0.95);
@@ -490,8 +505,8 @@
   /* ============ RESPONSIVE ============ */
   @media (max-width:900px){
     .shop-layout{ grid-template-columns:1fr; }
+    /* On mobile the filters-panel lives off-screen as a bottom sheet (filters-drawer class applied via JS) */
     .filters-panel{ display:none; }
-    .filters-panel.mobile-open{ display:block; position:fixed; left:0; right:0; bottom:0; top:auto; max-height:85vh; overflow-y:auto; border-radius:var(--radius-lg) var(--radius-lg) 0 0; z-index:101; box-shadow:var(--shadow-xl); }
     .filter-toggle-btn{ display:flex; }
     .trust-grid{ grid-template-columns:1fr 1fr; }
   }
@@ -605,7 +620,15 @@
 
     <div class="shop-layout">
       <aside class="filters-panel" id="filtersPanel" aria-label="Filter products">
-        <div class="filters-head"><h3>Filters</h3><button class="clear-filters-link" id="clearFiltersBtn">Clear all filters</button></div>
+        <!-- Drag handle + close — visible only inside the mobile bottom-sheet -->
+        <div class="filters-drawer-handle" id="filtersDrawerHandle" aria-hidden="true"></div>
+        <div class="filters-head">
+          <h3>Filters</h3>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button class="clear-filters-link" id="clearFiltersBtn">Clear all</button>
+            <button class="drawer-close" id="closeFiltersBtn" aria-label="Close filters" style="display:none;">✕</button>
+          </div>
+        </div>
         <fieldset class="filter-group">
           <legend>Price Range</legend>
           <label class="filter-option"><input type="checkbox" class="filter-price" value="0-5000"> Under ₹5,000</label>
@@ -966,7 +989,7 @@ function closeProductModal(){
 function closeOverlayIfNothingOpen(){
   const open = document.getElementById("cartDrawer").classList.contains("show")
     || document.getElementById("productModal").classList.contains("show")
-    || document.getElementById("filtersPanel").classList.contains("mobile-open");
+    || document.getElementById("filtersPanel").classList.contains("show");
   if (!open) document.getElementById("overlayBg").classList.remove("show");
 }
 function openCartDrawer(){
@@ -977,10 +1000,26 @@ function openCartDrawer(){
 }
 function closeCartDrawer(){ document.getElementById("cartDrawer").classList.remove("show"); closeOverlayIfNothingOpen(); }
 function openFiltersDrawer(){
-  document.getElementById("filtersPanel").classList.add("mobile-open", "filters-drawer");
+  const panel = document.getElementById("filtersPanel");
+  panel.classList.add("filters-drawer");
+  // Force a reflow so the initial translateY(100%) is painted before we add .show
+  panel.getBoundingClientRect();
+  panel.classList.add("show");
   document.getElementById("overlayBg").classList.add("show");
+  // Show the close ✕ button that lives inside the drawer
+  document.getElementById("closeFiltersBtn").style.display = "flex";
+  // Move focus into drawer for accessibility
+  const firstFocusable = panel.querySelector("button, input, [tabindex]");
+  if (firstFocusable) firstFocusable.focus();
 }
-function closeFiltersDrawer(){ document.getElementById("filtersPanel").classList.remove("mobile-open"); closeOverlayIfNothingOpen(); }
+function closeFiltersDrawer(){
+  const panel = document.getElementById("filtersPanel");
+  panel.classList.remove("show");
+  document.getElementById("closeFiltersBtn").style.display = "none";
+  // Remove filters-drawer class after transition completes so it returns to sidebar on desktop resize
+  setTimeout(() => panel.classList.remove("filters-drawer"), 360);
+  closeOverlayIfNothingOpen();
+}
 
 /* ============================================================
    EVENT WIRING
@@ -999,7 +1038,13 @@ document.getElementById("clearFiltersBtn").addEventListener("click", clearAllFil
 document.getElementById("cartBtn").addEventListener("click", openCartDrawer);
 document.getElementById("closeCartBtn").addEventListener("click", closeCartDrawer);
 document.getElementById("closeModalBtn").addEventListener("click", closeProductModal);
+document.getElementById("closeFiltersBtn").addEventListener("click", closeFiltersDrawer);
 document.getElementById("filterToggleBtn").addEventListener("click", openFiltersDrawer);
+// Also handle touchstart so tapping the button on real iOS/Android devices is instant
+document.getElementById("filterToggleBtn").addEventListener("touchend", function(e){
+  e.preventDefault(); // prevent the ghost 300ms click delay on some mobile browsers
+  openFiltersDrawer();
+});
 document.getElementById("overlayBg").addEventListener("click", () => { closeCartDrawer(); closeProductModal(); closeFiltersDrawer(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape"){ closeCartDrawer(); closeProductModal(); closeFiltersDrawer(); } });
 document.getElementById("headerWhatsapp").href = whatsappLink(WHATSAPP_GENERIC_MESSAGE);
