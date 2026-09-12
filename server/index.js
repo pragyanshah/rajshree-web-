@@ -10,6 +10,9 @@ const PORT = process.env.PORT || 3000;
 /* ── Security hardening ── */
 app.disable("x-powered-by");
 
+/* ── Trust Render / Railway / Heroku reverse proxy so secure cookies work ── */
+app.set("trust proxy", 1);
+
 /* ── Body parsing ── */
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -28,7 +31,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days
-    sameSite: "strict",
+    sameSite: "lax",                     // "strict" blocked cookies on some redirect flows
     secure:   process.env.NODE_ENV === "production"
   }
 }));
