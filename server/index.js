@@ -20,7 +20,8 @@ app.use(session({
   store: new pgSession({
     pool,                      // reuse the same connection pool as the rest of the app
     tableName: "session",      // default table name used by connect-pg-simple
-    createTableIfMissing: true // creates the session table automatically if needed
+    createTableIfMissing: true, // creates the session table automatically if needed
+    errorLog: () => {}         // silence non-critical session-prune errors (e.g. brief Neon timeouts)
   }),
   secret:            process.env.SESSION_SECRET || "dev-secret-change-me",
   resave:            false,
