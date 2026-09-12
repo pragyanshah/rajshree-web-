@@ -96,11 +96,20 @@ router.post("/login", loginLimiter, async (req, res) => {
     return res.status(401).json({ error: "Invalid credentials." });
   }
 
-  // Prefer the env var hash (set in Render dashboard) so login never depends
-  // on DB state. Fall back to DB only if the env var is not configured.
+  // Strategy 1: Plain-text password env var (simplest, no $ character issues)
+  const plainPw = process.env.ADMIN_PASSWORD;
+  if (plainPw) {
+    if (password === plainPw) {
+      req.session.admin = true;
+      return res.json({ ok: true });
+    }
+    return res.status(401).json({ error: "Invalid credentials." });
+  }
+
+  // Strategy 2: Bcrypt hash from env var or database (fallback)
   const hash = process.env.ADMIN_PASSWORD_HASH || await getPasswordHash();
   if (!hash) {
-    return res.status(500).json({ error: "Admin password not configured. Set ADMIN_PASSWORD_HASH in your environment variables." });
+    return res.status(500).json({ error: "Admin password not configured. Set ADMIN_PASSWORD in your Render environment variables." });
   }
 
   const match = await bcrypt.compare(password, hash);
