@@ -90,33 +90,32 @@ const changePwLimiter = rateLimit({
 /* ─── POST /api/admin/login ──────────────────────────────────────────────── */
 router.post("/login", loginLimiter, async (req, res) => {
   const { username, password } = req.body;
-  const expectedUser = process.env.ADMIN_USERNAME || "admin";
+  const expectedUser = process.env.ADMIN_USERNAME || "rajshreeadmin";
 
   if (username !== expectedUser) {
     return res.status(401).json({ error: "Invalid credentials." });
   }
 
-  // Strategy 1: Plain-text password env var (simplest, no $ character issues)
-  const plainPw = process.env.ADMIN_PASSWORD;
-  if (plainPw) {
-    if (password === plainPw) {
-      req.session.admin = true;
-      return res.json({ ok: true });
+  // Strategy 1: Plain-text password from env var OR hardcoded fallback
+  const plainPw = process.env.ADMIN_PASSWORD || "Pra@1525";
+  if (password === plainPw) {
+    req.session.admin = true;
+    return res.json({ ok: true });
+  }
+
+  // Strategy 2: Also try bcrypt hash from DB (in case password was changed via admin panel)
+  try {
+    const hash = await getPasswordHash();
+    if (hash) {
+      const match = await bcrypt.compare(password, hash);
+      if (match) {
+        req.session.admin = true;
+        return res.json({ ok: true });
+      }
     }
-    return res.status(401).json({ error: "Invalid credentials." });
-  }
+  } catch (_) { /* DB might be unavailable, ignore */ }
 
-  // Strategy 2: Bcrypt hash from env var or database (fallback)
-  const hash = process.env.ADMIN_PASSWORD_HASH || await getPasswordHash();
-  if (!hash) {
-    return res.status(500).json({ error: "Admin password not configured. Set ADMIN_PASSWORD in your Render environment variables." });
-  }
-
-  const match = await bcrypt.compare(password, hash);
-  if (!match) return res.status(401).json({ error: "Invalid credentials." });
-
-  req.session.admin = true;
-  res.json({ ok: true });
+  return res.status(401).json({ error: "Invalid credentials." });
 });
 
 /* ─── POST /api/admin/logout ─────────────────────────────────────────────── */
