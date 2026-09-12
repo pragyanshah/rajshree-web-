@@ -160,7 +160,7 @@ created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
 ### Shop Info (hardcoded):
 ```
 Name:     Rajshree Electronics
-Address:  94, Municipal Shopping Centre, near BNSL Office, Pilaji Ganj, Mehsana, Gujarat 384001
+Address:  9, 10, Municipal Shopping Centre, near BNSL Office, Pilaji Ganj, Mehsana, Gujarat 384001
 Phone:    094289 40074 / +919428940074
 WhatsApp: 919428940074
 Hours:    Open · Closes 9 PM · Mon–Sun
