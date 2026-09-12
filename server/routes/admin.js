@@ -92,14 +92,18 @@ router.post("/login", loginLimiter, async (req, res) => {
   const { username, password } = req.body;
   const expectedUser = process.env.ADMIN_USERNAME || "admin";
 
-  const hashInDB = await getPasswordHash();
-  if (!hashInDB) {
-    return res.status(500).json({ error: "Admin password not configured. Please set up a password first." });
-  }
   if (username !== expectedUser) {
     return res.status(401).json({ error: "Invalid credentials." });
   }
-  const match = await bcrypt.compare(password, hashInDB);
+
+  // Prefer the env var hash (set in Render dashboard) so login never depends
+  // on DB state. Fall back to DB only if the env var is not configured.
+  const hash = process.env.ADMIN_PASSWORD_HASH || await getPasswordHash();
+  if (!hash) {
+    return res.status(500).json({ error: "Admin password not configured. Set ADMIN_PASSWORD_HASH in your environment variables." });
+  }
+
+  const match = await bcrypt.compare(password, hash);
   if (!match) return res.status(401).json({ error: "Invalid credentials." });
 
   req.session.admin = true;
