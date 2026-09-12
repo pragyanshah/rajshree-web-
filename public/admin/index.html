@@ -270,7 +270,7 @@ function showToast(msg, isError = false) {
 /* ─── Session check on load ─── */
 async function checkSession() {
   try {
-    const res = await fetch("/api/admin/session");
+    const res = await fetch("/api/admin/session", { credentials: 'same-origin' });
     const data = await res.json();
     if (data.loggedIn) showDashboard();
     else showLogin();
@@ -289,6 +289,7 @@ document.getElementById("loginForm").addEventListener("submit", async e => {
   try {
     const res = await fetch("/api/admin/login", {
       method: "POST",
+      credentials: 'same-origin',
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username: document.getElementById("username").value,
@@ -305,14 +306,14 @@ document.getElementById("loginForm").addEventListener("submit", async e => {
 
 /* ─── Logout ─── */
 document.getElementById("logoutBtn").addEventListener("click", async () => {
-  await fetch("/api/admin/logout", { method: "POST" });
+  await fetch("/api/admin/logout", { method: "POST", credentials: 'same-origin' });
   showLogin();
 });
 
 /* ─── Fetch & render products ─── */
 async function fetchProducts() {
   try {
-    const res = await fetch("/api/admin/products");
+    const res = await fetch("/api/admin/products", { credentials: 'same-origin' });
     if (!res.ok) throw new Error("Not authorised");
     allProducts = await res.json();
     renderTable(allProducts);
@@ -375,7 +376,7 @@ document.getElementById("productForm").addEventListener("submit", async e => {
   try {
     const url    = id ? `/api/admin/products/${id}` : "/api/admin/products";
     const method = id ? "PUT" : "POST";
-    const res    = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const res    = await fetch(url, { method, credentials: 'same-origin', headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const data   = await res.json();
     if (!res.ok) throw new Error(data.error || "Save failed.");
     showToast(id ? "✅ Product updated!" : "✅ Product added!");
@@ -426,7 +427,7 @@ async function deleteProduct(id) {
   const p = allProducts.find(x => x.id === id);
   if (!confirm(`Delete "${p?.name || id}"? This cannot be undone.`)) return;
   try {
-    const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE", credentials: 'same-origin' });
     if (!res.ok) throw new Error((await res.json()).error);
     showToast("🗑️ Product deleted.");
     fetchProducts();
@@ -480,6 +481,7 @@ async function uploadFile(file) {
       });
       xhr.addEventListener("error", () => reject(new Error("Network error during upload.")));
       xhr.open("POST", "/api/admin/upload");
+      xhr.withCredentials = true;
       xhr.send(formData);
     });
 
@@ -540,6 +542,7 @@ document.getElementById("changePasswordForm").addEventListener("submit", async e
   try {
     const res  = await fetch("/api/admin/change-password", {
       method:  "POST",
+      credentials: 'same-origin',
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ currentPassword, newPassword })
     });
@@ -617,7 +620,7 @@ csvImportBtn.addEventListener("click", async () => {
   formData.append("csv", selectedCSV);
 
   try {
-    const res  = await fetch("/api/admin/products/bulk-import", { method: "POST", body: formData });
+    const res  = await fetch("/api/admin/products/bulk-import", { method: "POST", credentials: 'same-origin', body: formData });
     const data = await res.json();
 
     if (!res.ok) {
